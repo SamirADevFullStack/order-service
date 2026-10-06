@@ -1,0 +1,29 @@
+### Créer une commande (ouvrir ce fichier dans IntelliJ et cliquer sur la flèche verte)
+POST http://localhost:8080/api/orders
+Content-Type: application/json
+
+{
+  "customerId": "C-001",
+  "currency": "EUR",
+  "lines": [
+    { "productCode": "BOOK", "quantity": 2, "unitPrice": 12.50 },
+    { "productCode": "PEN",  "quantity": 3, "unitPrice": 1.20 }
+  ]
+}
+
+### Requête invalide (validation technique) -> 400
+POST http://localhost:8080/api/orders
+Content-Type: application/json
+
+{ "customerId": "", "currency": "EUR", "lines": [] }
+
+### Règle MÉTIER violée (plafond de 10 000 dépassé) -> 400 "Commande invalide"
+# Le JSON est techniquement valide : c'est le domaine (Order.create) qui refuse.
+POST http://localhost:8080/api/orders
+Content-Type: application/json
+
+{
+  "customerId": "C-002",
+  "currency": "EUR",
+  "lines": [ { "productCode": "BOOK", "quantity": 1000, "unitPrice": 12.50 } ]
+}

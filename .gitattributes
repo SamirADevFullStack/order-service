@@ -1,0 +1,8 @@
+# Fins de ligne : LF dans le dépôt ET dans la copie de travail, quel que soit l'OS.
+# Ce fichier est versionné : la règle s'impose à tous, contrairement à core.autocrlf (réglage local).
+# Évite les scripts shell cassés dans Docker (/bin/sh^M) et les diffs « tout le fichier a changé ».
+* text=auto eol=lf
+
+# Scripts Windows : CRLF obligatoire (ex. mvnw.cmd)
+*.cmd text eol=crlf
+*.bat text eol=crlf

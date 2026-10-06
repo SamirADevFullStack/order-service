@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: order-service
+  description: >-
+    Contrat de l'API de commandes. Approche API-first : ce fichier est la source de vérité.
+    L'interface OrdersApi et les DTO Java sont générés à partir de lui au build (openapi-generator).
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Orders
+    description: Création des commandes
+paths:
+  /api/orders:
+    post:
+      tags:
+        - Orders
+      operationId: createOrder
+      summary: Créer une commande
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Commande créée
+          headers:
+            Location:
+              description: URL de la commande créée
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: JSON invalide ou règle métier violée (format RFC 7807)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - customerId
+        - currency
+        - lines
+      properties:
+        customerId:
+          type: string
+          minLength: 1
+          example: C-001
+        currency:
+          type: string
+          description: Code ISO 4217 sur 3 lettres
+          pattern: '^[A-Z]{3}$'
+          example: EUR
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderLineRequest'
+    OrderLineRequest:
+      type: object
+      required:
+        - productCode
+        - quantity
+        - unitPrice
+      properties:
+        productCode:
+          type: string
+          minLength: 1
+          example: BOOK
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 2
+        unitPrice:
+          type: number
+          minimum: 0
+          example: 12.50
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          example: C-001
+        status:
+          type: string
+          example: CREATED
+        totalAmount:
+          type: number
+          example: 28.60
+        currency:
+          type: string
+          example: EUR
+        createdAt:
+          type: string
+          format: date-time
+    ApiError:
+      type: object
+      description: Erreur au format Problem Details (RFC 7807)
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+          example: Commande invalide
+        status:
+          type: integer
+          format: int32
+          example: 400
+        detail:
+          type: string
+        instance:
+          type: string
