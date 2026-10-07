@@ -1,6 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, effect, signal } from '@angular/core';
 import { CartLine, MAX_TOTAL_CENTS, exceedsMax, lineTotalCents, totalCents } from './cart-line';
+import { DRAFT_KEY, loadDraft, saveDraft } from './cart-draft';
 
 /** Panier de départ : 9 975,00 €. Deux BOOK de plus atteignent exactement le plafond. */
 const INITIAL_LINES: readonly CartLine[] = [
@@ -16,7 +17,7 @@ const INITIAL_LINES: readonly CartLine[] = [
 })
 export class Cart {
   // l'état : un signal de lignes, initialisé avec INITIAL_LINES
-  protected readonly lines = signal<readonly CartLine[]>(INITIAL_LINES);
+  protected readonly lines = signal<readonly CartLine[]>(loadDraft(localStorage) ?? INITIAL_LINES);
 
   // deux computed, en centimes : le total
   protected readonly total = computed<number>(() => {
@@ -28,6 +29,13 @@ export class Cart {
 
   // le template ne voit que les membres du composant : on lui expose la fonction importée
   protected readonly lineTotalCents = lineTotalCents;
+
+  constructor() {
+    effect(() =>
+      /* à compléter : sauvegarder this.lines() dans localStorage */
+      saveDraft(localStorage, this.lines()),
+    );
+  }
 
   protected canIncrement(line: CartLine): boolean {
     // ajouter UNE unité de cette ligne au total dépasserait-il le plafond ?

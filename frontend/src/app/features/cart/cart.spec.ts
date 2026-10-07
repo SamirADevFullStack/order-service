@@ -6,6 +6,7 @@ describe('Cart', () => {
   let page: HTMLElement;
 
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({ imports: [Cart] }).compileComponents();
     fixture = TestBed.createComponent(Cart);
     page = fixture.nativeElement as HTMLElement;
@@ -86,5 +87,45 @@ describe('Cart', () => {
     expect(page.querySelector('[data-testid="empty"]')).not.toBeNull();
     expect(totalDigits()).toBe('000');
     expect(page.textContent).not.toContain('Vider le panier');
+  });
+
+  describe('brouillon dans le localStorage', () => {
+    const DRAFT_KEY = 'order-service.cart-draft';
+
+    /** Crée un nouveau panier, comme après un rechargement de la page (F5). */
+    async function reloadCart(): Promise<HTMLElement> {
+      const reloaded = TestBed.createComponent(Cart);
+      await reloaded.whenStable();
+      return reloaded.nativeElement as HTMLElement;
+    }
+
+    it('sauvegarde le panier après chaque modification', async () => {
+      await click('Augmenter BOOK');
+      const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? '[]');
+      expect(saved).toEqual([
+        { productCode: 'BOOK', quantity: 3, unitPrice: 12.5 },
+        { productCode: 'LAPTOP', quantity: 1, unitPrice: 9950 },
+      ]);
+    });
+
+    it('restaure le panier au rechargement de la page', async () => {
+      await click('Retirer LAPTOP');
+      const reloaded = await reloadCart();
+      expect(reloaded.querySelectorAll('[data-testid="line"]').length).toBe(1);
+      expect(reloaded.textContent).toContain('BOOK');
+      expect(reloaded.textContent).not.toContain('LAPTOP');
+    });
+
+    it('restaure un panier vidé comme un panier vide, pas comme le panier de départ', async () => {
+      await click('Vider le panier');
+      const reloaded = await reloadCart();
+      expect(reloaded.querySelector('[data-testid="empty"]')).not.toBeNull();
+    });
+
+    it('ignore un brouillon illisible et repart du panier de départ', async () => {
+      localStorage.setItem(DRAFT_KEY, '{pas du JSON');
+      const reloaded = await reloadCart();
+      expect(reloaded.querySelectorAll('[data-testid="line"]').length).toBe(2);
+    });
   });
 });
