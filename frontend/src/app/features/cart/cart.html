@@ -1,1 +1,56 @@
-<p>cart works!</p>
+<section class="cart">
+  <h1>Mon panier</h1>
+
+  <ul class="lines">
+    @for (line of lines(); track line.productCode) {
+      <li class="line" data-testid="line">
+        <span class="product">{{ line.productCode }}</span>
+        <span class="unit-price">{{ line.unitPrice | currency: 'EUR' }}</span>
+        <span class="quantity">
+          <button
+            type="button"
+            class="qty-button"
+            [attr.aria-label]="'Diminuer ' + line.productCode"
+            [disabled]="line.quantity === 1"
+            (click)="decrement(line.productCode)"
+          >
+            −
+          </button>
+          <span class="qty-value" data-testid="quantity">{{ line.quantity }}</span>
+          <button
+            type="button"
+            class="qty-button"
+            [attr.aria-label]="'Augmenter ' + line.productCode"
+            [disabled]="!canIncrement(line)"
+            (click)="increment(line.productCode)"
+          >
+            +
+          </button>
+        </span>
+        <span class="line-total">{{ lineTotalCents(line) / 100 | currency: 'EUR' }}</span>
+        <button
+          type="button"
+          class="remove-button"
+          [attr.aria-label]="'Retirer ' + line.productCode"
+          (click)="remove(line.productCode)"
+        >
+          Retirer
+        </button>
+      </li>
+    } @empty {
+      <li class="empty" data-testid="empty">Votre panier est vide.</li>
+    }
+  </ul>
+
+  <div class="summary">
+    <p class="total" data-testid="total">Total : {{ total() / 100 | currency: 'EUR' }}</p>
+
+    @if (remaining() === 0) {
+      <p class="warning" data-testid="max-reached">Plafond de 10 000 € atteint.</p>
+    }
+
+    @if (lines().length > 0) {
+      <button type="button" class="clear-button" (click)="clear()">Vider le panier</button>
+    }
+  </div>
+</section>
