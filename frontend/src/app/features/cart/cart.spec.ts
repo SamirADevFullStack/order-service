@@ -1,5 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Cart } from './cart';
+import { of } from 'rxjs';
+import { CatalogService } from './catalog-service';
+import { Product } from './product.model';
+
+/** Faux catalogue : le test maîtrise les produits, au lieu de dépendre du vrai service. */
+const FAKE_PRODUCTS: readonly Product[] = [
+  { code: 'BOOK', label: 'Livre', unitPrice: 12.5 },
+  { code: 'PEN', label: 'Stylo', unitPrice: 1.2 },
+  { code: 'LAPTOP', label: 'Ordinateur portable', unitPrice: 9950 },
+];
 
 describe('Cart', () => {
   let fixture: ComponentFixture<Cart>;
@@ -7,7 +17,10 @@ describe('Cart', () => {
 
   beforeEach(async () => {
     localStorage.clear();
-    await TestBed.configureTestingModule({ imports: [Cart] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [Cart],
+      providers: [{ provide: CatalogService, useValue: { products: () => of(FAKE_PRODUCTS) } }],
+    }).compileComponents();
     fixture = TestBed.createComponent(Cart);
     page = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
@@ -126,6 +139,49 @@ describe('Cart', () => {
       localStorage.setItem(DRAFT_KEY, '{pas du JSON');
       const reloaded = await reloadCart();
       expect(reloaded.querySelectorAll('[data-testid="line"]').length).toBe(2);
+    });
+  });
+
+  describe('ajout depuis le catalogue', () => {
+    /** Choisit un produit dans la liste déroulante, comme le ferait l'utilisateur. */
+    async function selectProduct(code: string): Promise<void> {
+      const select = page.querySelector<HTMLSelectElement>('select[aria-label="Produit"]');
+      if (!select) {
+        throw new Error('Liste des produits introuvable');
+      }
+      select.value = code;
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    }
+
+    it('propose les produits du catalogue', () => {
+      const codes = Array.from(page.querySelectorAll<HTMLOptionElement>('select option'))
+        .map((option) => option.value)
+        .filter((value) => value !== '');
+      expect(codes).toEqual(['BOOK', 'PEN', 'LAPTOP']);
+    });
+
+    it("désactive « Ajouter » tant qu'aucun produit n'est choisi", () => {
+      expect(button('Ajouter').disabled).toBe(true);
+    });
+
+    it('ajoute un produit absent du panier avec une quantité de 1', async () => {
+      await selectProduct('PEN');
+      await click('Ajouter');
+      expect(lineCount()).toBe(3);
+      expect(totalDigits()).toBe('997620');
+    });
+
+    it('additionne la quantité si le produit est déjà dans le panier', async () => {
+      await selectProduct('BOOK');
+      await click('Ajouter');
+      expect(lineCount()).toBe(2);
+      expect(page.querySelector('[data-testid="quantity"]')?.textContent?.trim()).toBe('3');
+    });
+
+    it('désactive « Ajouter » si une unité du produit dépasserait le plafond', async () => {
+      await selectProduct('LAPTOP');
+      expect(button('Ajouter').disabled).toBe(true);
     });
   });
 });

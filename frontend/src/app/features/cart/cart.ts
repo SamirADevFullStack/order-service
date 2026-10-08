@@ -1,7 +1,9 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, effect, signal } from '@angular/core';
 import { CartLine, MAX_TOTAL_CENTS, exceedsMax, lineTotalCents, totalCents } from './cart-line';
 import { DRAFT_KEY, loadDraft, saveDraft } from './cart-draft';
+import { CatalogService } from './catalog-service';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 /** Panier de départ : 9 975,00 €. Deux BOOK de plus atteignent exactement le plafond. */
 const INITIAL_LINES: readonly CartLine[] = [
@@ -16,6 +18,49 @@ const INITIAL_LINES: readonly CartLine[] = [
   styleUrl: './cart.scss',
 })
 export class Cart {
+  private readonly catalog = inject(CatalogService);
+  protected readonly products = toSignal(this.catalog.products(), { initialValue: [] });
+  protected readonly selectedCode = signal('');
+
+  protected readonly selectedProduct = computed(() =>
+    this.products().find((product) => product.code === this.selectedCode()),
+  );
+
+  protected readonly canAdd = computed(() => {
+    const product = this.selectedProduct();
+    if (!product) {
+      return false;
+    }
+    // ici, TypeScript sait que product n'est plus undefined
+    // → calculer le prix d'une unité en centimes, puis vérifier le plafond
+    const unitCents = lineTotalCents({
+      productCode: product.code,
+      quantity: 1,
+      unitPrice: product.unitPrice,
+    });
+
+    return !exceedsMax(this.total() + unitCents);
+  });
+
+  protected add(): void {
+    const product = this.selectedProduct();
+    if (!product) {
+      return;
+    }
+
+    /* une ligne a-t-elle déjà ce productCode ? */
+    const alreadyInCart = this.lines().some((line) => line.productCode === product.code);
+
+    if (alreadyInCart) {
+      this.increment(product.code);
+    } else {
+      this.lines.update((lines) => [
+        ...lines,
+        { productCode: product.code, quantity: 1, unitPrice: product.unitPrice },
+      ]);
+    }
+  }
+
   // l'état : un signal de lignes, initialisé avec INITIAL_LINES
   protected readonly lines = signal<readonly CartLine[]>(loadDraft(localStorage) ?? INITIAL_LINES);
 
