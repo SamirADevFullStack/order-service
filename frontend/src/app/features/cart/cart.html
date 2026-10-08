@@ -2,7 +2,12 @@
   <h1>Mon panier</h1>
 
   <div class="add-form">
-    <select #productSelect aria-label="Produit" (change)="selectedCode.set(productSelect.value)">
+    <select
+      #productSelect
+      aria-label="Produit"
+      [value]="selectedCode()"
+      (change)="selectedCode.set(productSelect.value)"
+    >
       <option value="">Choisir un produit</option>
       @for (product of products(); track product.code) {
         <option [value]="product.code">
@@ -10,6 +15,15 @@
         </option>
       }
     </select>
+
+    <input
+      #quantityInput
+      type="number"
+      min="1"
+      aria-label="Quantité"
+      [value]="quantity()"
+      (input)="onQuantityInput(quantityInput.valueAsNumber)"
+    />
 
     <button type="button" class="add-button" [disabled]="!canAdd()" (click)="add()">Ajouter</button>
   </div>

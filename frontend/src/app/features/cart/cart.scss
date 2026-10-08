@@ -26,7 +26,18 @@ h1 {
   font: inherit;
 }
 
-.add-form select:focus-visible {
+/* Le champ quantité n'a besoin que de la largeur de quelques chiffres. */
+.add-form input[type='number'] {
+  width: 5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  text-align: center;
+}
+
+.add-form select:focus-visible,
+.add-form input:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

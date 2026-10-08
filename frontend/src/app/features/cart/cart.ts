@@ -2,7 +2,7 @@ import { CurrencyPipe } from '@angular/common';
 import { CartLine, MAX_TOTAL_CENTS, exceedsMax, lineTotalCents, totalCents } from './cart-line';
 import { DRAFT_KEY, loadDraft, saveDraft } from './cart-draft';
 import { CatalogService } from './catalog-service';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 /** Panier de départ : 9 975,00 €. Deux BOOK de plus atteignent exactement le plafond. */
@@ -19,8 +19,24 @@ const INITIAL_LINES: readonly CartLine[] = [
 })
 export class Cart {
   private readonly catalog = inject(CatalogService);
+
   protected readonly products = toSignal(this.catalog.products(), { initialValue: [] });
+
   protected readonly selectedCode = signal('');
+
+  protected readonly quantity = linkedSignal({
+    // le signal surveillé
+    source: this.selectedCode,
+    // la valeur à prendre quand la source change
+    computation: () => 1,
+  });
+
+  constructor() {
+    effect(() =>
+      /* sauvegarder this.lines() dans localStorage */
+      saveDraft(localStorage, this.lines()),
+    );
+  }
 
   protected readonly selectedProduct = computed(() =>
     this.products().find((product) => product.code === this.selectedCode()),
@@ -31,15 +47,14 @@ export class Cart {
     if (!product) {
       return false;
     }
-    // ici, TypeScript sait que product n'est plus undefined
-    // → calculer le prix d'une unité en centimes, puis vérifier le plafond
-    const unitCents = lineTotalCents({
+
+    const addedCents = lineTotalCents({
       productCode: product.code,
-      quantity: 1,
+      quantity: this.quantity(),
       unitPrice: product.unitPrice,
     });
 
-    return !exceedsMax(this.total() + unitCents);
+    return !exceedsMax(this.total() + addedCents);
   });
 
   protected add(): void {
@@ -52,12 +67,31 @@ export class Cart {
     const alreadyInCart = this.lines().some((line) => line.productCode === product.code);
 
     if (alreadyInCart) {
-      this.increment(product.code);
+      this.addQuantity(product.code, this.quantity());
     } else {
       this.lines.update((lines) => [
         ...lines,
-        { productCode: product.code, quantity: 1, unitPrice: product.unitPrice },
+        { productCode: product.code, quantity: this.quantity(), unitPrice: product.unitPrice },
       ]);
+    }
+  }
+
+  private addQuantity(productCode: string, quantity: number): void {
+    // le même map qu'increment, mais avec + quantity au lieu de + 1
+    this.lines.update((lines) =>
+      lines.map((line) =>
+        line.productCode === productCode ? { ...line, quantity: line.quantity + quantity } : line,
+      ),
+    );
+  }
+
+  protected onQuantityInput(value: number): void {
+    // si value est un entier (Number.isInteger) ET >= 1 → this.quantity.set(value)
+    if (Number.isInteger(value) && value >= 1) {
+      this.quantity.set(value);
+    } else {
+      // sinon → ne rien faire (on garde la dernière quantité valide)
+      return;
     }
   }
 
@@ -75,13 +109,6 @@ export class Cart {
   // le template ne voit que les membres du composant : on lui expose la fonction importée
   protected readonly lineTotalCents = lineTotalCents;
 
-  constructor() {
-    effect(() =>
-      /* à compléter : sauvegarder this.lines() dans localStorage */
-      saveDraft(localStorage, this.lines()),
-    );
-  }
-
   protected canIncrement(line: CartLine): boolean {
     // ajouter UNE unité de cette ligne au total dépasserait-il le plafond ?
     // indice : exceedsMax et lineTotalCents({ ...line, quantity: 1 })
@@ -90,22 +117,29 @@ export class Cart {
   }
 
   protected increment(productCode: string): void {
-    // update + map : la ligne concernée devient une NOUVELLE ligne avec quantity + 1
-    this.lines.update((lines) =>
-      lines.map((line) =>
-        line.productCode === productCode ? { ...line, quantity: line.quantity + 1 } : line,
-      ),
-    );
+    this.addQuantity(productCode, 1);
+  }
+  protected decrement(productCode: string): void {
+    this.addQuantity(productCode, -1);
   }
 
-  protected decrement(productCode: string): void {
-    // même chose avec quantity - 1
-    this.lines.update((lines) =>
-      lines.map((line) =>
-        line.productCode === productCode ? { ...line, quantity: line.quantity - 1 } : line,
-      ),
-    );
-  }
+  // protected increment(productCode: string): void {
+  //   // update + map : la ligne concernée devient une NOUVELLE ligne avec quantity + 1
+  //   this.lines.update((lines) =>
+  //     lines.map((line) =>
+  //       line.productCode === productCode ? { ...line, quantity: line.quantity + 1 } : line,
+  //     ),
+  //   );
+  // }
+
+  // protected decrement(productCode: string): void {
+  //   // même chose avec quantity - 1
+  //   this.lines.update((lines) =>
+  //     lines.map((line) =>
+  //       line.productCode === productCode ? { ...line, quantity: line.quantity - 1 } : line,
+  //     ),
+  //   );
+  // }
 
   protected remove(productCode: string): void {
     // update + filter : garder les lignes dont le productCode est différent
