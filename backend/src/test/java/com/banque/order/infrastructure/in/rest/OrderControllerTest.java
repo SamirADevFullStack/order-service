@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.banque.order.application.port.in.CreateOrderUseCase;
+import com.banque.order.application.port.in.ListOrdersUseCase;
 import com.banque.order.domain.exception.InvalidOrderException;
 import com.banque.order.domain.model.Money;
 import com.banque.order.domain.model.Order;
@@ -36,12 +37,13 @@ class OrderControllerTest {
             """;
 
     private final CreateOrderUseCase createOrderUseCase = mock(CreateOrderUseCase.class);
+    private final ListOrdersUseCase listOrdersUseCase = mock(ListOrdersUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new OrderController(createOrderUseCase, new OrderRestMapper()))
+                .standaloneSetup(new OrderController(createOrderUseCase, new OrderRestMapper(), listOrdersUseCase))
                 .setControllerAdvice(new RestExceptionHandler())
                 .build();
     }

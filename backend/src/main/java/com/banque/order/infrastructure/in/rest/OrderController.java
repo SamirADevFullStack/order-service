@@ -1,12 +1,17 @@
 package com.banque.order.infrastructure.in.rest;
 
 import com.banque.order.application.port.in.CreateOrderUseCase;
+import com.banque.order.application.port.in.ListOrdersUseCase;
 import com.banque.order.domain.model.Order;
 import com.banque.order.infrastructure.in.rest.api.OrdersApi;
 import com.banque.order.infrastructure.in.rest.api.model.CreateOrderRequest;
+import com.banque.order.infrastructure.in.rest.api.model.OrderDetail;
+import com.banque.order.infrastructure.in.rest.api.model.OrderPage;
 import com.banque.order.infrastructure.in.rest.api.model.OrderResponse;
 import com.banque.order.infrastructure.in.rest.mapper.OrderRestMapper;
 import java.net.URI;
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,10 +26,23 @@ public class OrderController implements OrdersApi {
 
     private final CreateOrderUseCase createOrderUseCase;
     private final OrderRestMapper mapper;
+    private final ListOrdersUseCase listOrdersUseCase;
 
-    public OrderController(CreateOrderUseCase createOrderUseCase, OrderRestMapper mapper) {
+    public OrderController(CreateOrderUseCase createOrderUseCase, OrderRestMapper mapper, ListOrdersUseCase listOrdersUseCase) {
         this.createOrderUseCase = createOrderUseCase;
         this.mapper = mapper;
+        this.listOrdersUseCase = listOrdersUseCase;
+    }
+
+    // TODO 2c : implémentation provisoire, pour que le projet compile pendant 2b
+    @Override
+    public ResponseEntity<OrderPage> listOrders(Integer page, Integer size) {
+        throw new UnsupportedOperationException("À implémenter en 2c");
+    }
+
+    @Override
+    public ResponseEntity<OrderDetail> getOrder(UUID orderId) {
+        throw new UnsupportedOperationException("À implémenter en 2c");
     }
 
     @Override
@@ -35,3 +53,5 @@ public class OrderController implements OrdersApi {
                 .body(mapper.toResponse(order));
     }
 }
+
+

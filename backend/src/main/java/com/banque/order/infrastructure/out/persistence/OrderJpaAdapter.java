@@ -1,9 +1,12 @@
 package com.banque.order.infrastructure.out.persistence;
 
+import com.banque.order.application.pagination.PageQuery;
 import com.banque.order.application.port.out.OrderRepository;
 import com.banque.order.domain.model.Order;
 import com.banque.order.domain.model.OrderId;
 import java.util.Optional;
+
+import com.banque.order.application.pagination.PageResult;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,5 +36,11 @@ public class OrderJpaAdapter implements OrderRepository {
     @Transactional(readOnly = true)
     public Optional<Order> findById(OrderId id) {
         return jpaRepository.findById(id.value()).map(mapper::toDomain);
+    }
+
+    // TODO 2c : implémentation provisoire, pour que le projet compile pendant 2b
+    @Override
+    public PageResult<Order> findAll(PageQuery query) {
+        throw new UnsupportedOperationException("À implémenter en 2c");
     }
 }
