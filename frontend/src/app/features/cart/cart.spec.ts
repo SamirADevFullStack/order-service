@@ -16,6 +16,9 @@ describe('Cart', () => {
   let page: HTMLElement;
 
   beforeEach(async () => {
+    // La sauvegarde du brouillon est différée par debounceTime, qui utilise setInterval et Date.
+    // On ne simule QUE ces horloges : Angular garde ses vraies horloges pour rafraîchir l'écran.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Cart],
@@ -24,6 +27,10 @@ describe('Cart', () => {
     fixture = TestBed.createComponent(Cart);
     page = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   /** Trouve un bouton par son aria-label ou par son texte visible. */
@@ -105,6 +112,16 @@ describe('Cart', () => {
   describe('brouillon dans le localStorage', () => {
     const DRAFT_KEY = 'order-service.cart-draft';
 
+    /** Fait passer le délai de la sauvegarde différée. */
+    async function waitForSave(): Promise<void> {
+      await vi.advanceTimersByTimeAsync(500);
+    }
+
+    /** Le panier sauvegardé, tel qu'il est lu dans le localStorage. */
+    function savedDraft(): unknown {
+      return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+    }
+
     /** Crée un nouveau panier, comme après un rechargement de la page (F5). */
     async function reloadCart(): Promise<HTMLElement> {
       const reloaded = TestBed.createComponent(Cart);
@@ -112,17 +129,33 @@ describe('Cart', () => {
       return reloaded.nativeElement as HTMLElement;
     }
 
-    it('sauvegarde le panier après chaque modification', async () => {
+    it('sauvegarde le panier 500 ms après la dernière modification', async () => {
       await click('Augmenter BOOK');
-      const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? '[]');
-      expect(saved).toEqual([
+      await waitForSave();
+      expect(savedDraft()).toEqual([
         { productCode: 'BOOK', quantity: 3, unitPrice: 12.5 },
+        { productCode: 'LAPTOP', quantity: 1, unitPrice: 9950 },
+      ]);
+    });
+
+    it("ne sauvegarde pas tant que l'utilisateur continue de modifier le panier", async () => {
+      await click('Augmenter BOOK');
+      await vi.advanceTimersByTimeAsync(300);
+      await click('Augmenter BOOK');
+      await vi.advanceTimersByTimeAsync(300);
+      // 600 ms depuis le premier clic, mais seulement 300 ms depuis le dernier : rien n'est sauvegardé
+      expect(savedDraft()).toBeNull();
+      await vi.advanceTimersByTimeAsync(200);
+      // 500 ms de calme : une seule sauvegarde, avec la valeur finale
+      expect(savedDraft()).toEqual([
+        { productCode: 'BOOK', quantity: 4, unitPrice: 12.5 },
         { productCode: 'LAPTOP', quantity: 1, unitPrice: 9950 },
       ]);
     });
 
     it('restaure le panier au rechargement de la page', async () => {
       await click('Retirer LAPTOP');
+      await waitForSave();
       const reloaded = await reloadCart();
       expect(reloaded.querySelectorAll('[data-testid="line"]').length).toBe(1);
       expect(reloaded.textContent).toContain('BOOK');
@@ -131,6 +164,7 @@ describe('Cart', () => {
 
     it('restaure un panier vidé comme un panier vide, pas comme le panier de départ', async () => {
       await click('Vider le panier');
+      await waitForSave();
       const reloaded = await reloadCart();
       expect(reloaded.querySelector('[data-testid="empty"]')).not.toBeNull();
     });
