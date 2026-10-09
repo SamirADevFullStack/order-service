@@ -115,3 +115,95 @@
    surcharger la propriété **ne fonctionne pas**. Les versions sont résolues à l'import ; il faut déclarer la version
    explicitement ou importer un autre BOM *avant* celui de Spring Boot. Dans tous les cas, on documente pourquoi
    et quand retirer la surcharge (ici : quand Spring Boot gérera Surefire en version 3.5.4 ou plus).
+
+## Étape 1 : le socle Angular et les signals (2026-10-06 → 2026-10-09)
+
+Exercice : une page Panier. On choisit des produits dans un catalogue, avec une quantité ; le total se calcule seul ;
+le plafond de 10 000 € (même règle que `Order.create` côté back) bloque les ajouts ; le panier survit à un F5.
+
+### Notions vues
+
+- **Projet Angular 21 zoneless** (`ng new ... --zoneless --skip-git`) : sans zone.js, Angular rafraîchit l'écran quand
+  un **signal lu par le template** change, ou après un événement du template. L'état d'écran doit donc être en signals.
+  `--skip-git` évite un dépôt Git imbriqué dans le monorepo.
+- **Composants standalone** : chaque composant déclare ses dépendances dans `imports` (`RouterLink`, `CurrencyPipe`…).
+  Un oubli ne donne souvent **aucune erreur** : `routerLink="/panier"` devient un simple attribut HTML inerte.
+- **Routing et lazy loading** : `loadComponent: () => import('./features/cart/cart').then((m) => m.Cart)` place le
+  composant dans un chunk séparé, téléchargé à la première visite. `App` est la coquille ; `<router-outlet />` est
+  l'emplacement que le routeur remplit. `pathMatch: 'full'` sur la route vide, et la route `'**'` en dernier.
+- **Logique métier en fonctions pures** (`cart-line.ts`) : sans Angular, testées sans `TestBed`. C'est le `domain` de
+  l'hexagonal côté front. Montants calculés en **centimes entiers** (`Math.round(prix * 100) * quantité`),
+  car `0.1 + 0.2 = 0.30000000000000004` en JavaScript.
+- **`signal`** : `lines()` pour lire, `set` pour remplacer, `update` pour calculer à partir de l'ancienne valeur.
+  `set` quand la nouvelle valeur ne dépend pas de l'ancienne (`clear`), `update` sinon.
+- **Immuabilité** : on ne modifie jamais un tableau sur place. `map` + `{ ...line, quantity: ... }` pour transformer,
+  `filter` pour retirer, `[...lines, nouvelleLigne]` pour ajouter.
+- **`computed`** : une valeur dérivée, en lecture seule, mise en cache, dont les dépendances sont détectées seules
+  (`total`, `remaining`, `selectedProduct`, `canAdd`). Un `computed` peut lire un autre `computed`.
+- **Control flow** : `@for (...; track line.productCode)` avec une clé métier unique, `@empty`, `@if`.
+  Liaisons : `{{ }}`, `[propriété]`, `[attr.aria-label]`, `(événement)`, pipe `| currency`.
+- **`effect`** : agir sur l'extérieur (localStorage) à chaque changement d'un signal. Créé dans le constructeur
+  (contexte d'injection), arrêté automatiquement avec le composant. Jamais pour calculer une valeur ou modifier un signal.
+- **Service `@Injectable({ providedIn: 'root' })` + `inject()`** : le catalogue. Un service se justifie quand il y a
+  des dépendances, un état partagé, ou un besoin de le remplacer dans les tests (`{ provide: ..., useValue: ... }`).
+  Un calcul pur reste une simple fonction exportée.
+- **`toSignal`** : Observable → signal, avec `initialValue` (le signal doit avoir une valeur avant la première émission)
+  et désabonnement automatique.
+- **`linkedSignal({ source, computation })`** : un signal **modifiable** qui se réinitialise quand sa source change
+  (la quantité revient à 1 quand on change de produit). Remplace l'anti-pattern « `effect` qui fait un `set` ».
+- **Les deux sens d'un champ de formulaire** : `[value]="signal()"` pour afficher, `(input)` / `(change)` pour écrire.
+  Sans `[value]`, l'écran et l'état peuvent diverger.
+- **`toObservable` + `debounceTime(500)`** : signal → Observable, pour accéder aux opérateurs temporels de RxJS.
+  La sauvegarde n'a lieu qu'après 500 ms sans modification. `toObservable` termine son flux à la destruction du composant.
+- **Locale** : `{ provide: LOCALE_ID, useValue: 'fr-FR' }`, `registerLocaleData(localeFr)` et
+  `DEFAULT_CURRENCY_CODE` changent le format de **tous** les pipes depuis la configuration (`9 975,00 €`).
+- **Tests Vitest** : tests par le DOM avec `aria-label` et `data-testid`, `await fixture.whenStable()` après chaque
+  action (zoneless), `localStorage.clear()` dans le `beforeEach` pour isoler les tests, faux service injecté,
+  et horloge simulée (`vi.useFakeTimers`) pour la sauvegarde différée.
+
+### Pièges rencontrés
+
+- **Un test tautologique** : `expect(exceedsMax(MAX_TOTAL_CENTS)).toBe(false)` passait avec un plafond à 0, car
+  l'attendu était calculé avec le code testé. L'attendu doit être une valeur en dur, issue du besoin métier (`1_000_000`).
+- **L'unité dans le nom** : `MAX_TOTAL_CENTS = 10_000` faisait 100 € et non 10 000 €. Le suffixe `_CENTS` a permis de voir l'erreur.
+- **Un import statique casse le lazy loading sans prévenir** : `import { Cart }` dans `app.ts` laissait un chunk `cart`
+  de 60 octets (une simple redirection). Il faut regarder la **taille** du chunk dans `ng build`, pas seulement sa présence.
+- **Un composant écrit en dur dans `App`** (`<app-cart/>`) contourne le routeur : l'URL change, mais l'écran n'en dépend plus.
+- **`computed(() => { totalCents(...) })` sans `return`** donne un `Signal<void>`. Le typer `computed<number>` fait
+  apparaître l'erreur tout de suite.
+- **`map` qui renvoie la condition** (`lines.map((l) => l.productCode === code)`) produit un tableau de booléens ;
+  `filter` retire des lignes au lieu de les modifier. `map` transforme, `filter` sélectionne.
+- **Un `try` qui n'entoure pas la ligne risquée** : `JSON.parse` déplacé avant le `try` ne protégeait plus rien.
+- **`return null` dans une fonction `void`** est refusé par TypeScript ; un `catch` vide se commente.
+- **`localStorage.clear()` hors du `beforeEach`** ne s'exécute qu'une fois : les tests se transmettaient le panier.
+- **`vi.useFakeTimers()` sans option bloque les tests zoneless** : Angular planifie le rafraîchissement avec `setTimeout`.
+  Et `debounceTime` vérifie `Date.now()` : il faut simuler `setInterval`, `clearInterval` **et** `Date`, rien de plus.
+- **Deux méthodes du même nom dans une classe** : la dernière écrase la première ; l'ancienne version doit être commentée.
+- **La traduction automatique de Chrome** réécrivait la page (`BOOK` → « LIVRE ») tant que `index.html` déclarait `lang="en"`.
+- **Un fichier non enregistré** (le rond ● de l'onglet VS Code) : `ng test` et le relecteur voient l'ancienne version.
+  Auto Save, format à l'enregistrement (Prettier) et imports automatiques sont configurés dans `.vscode/settings.json`.
+
+### Questions d'entretien
+
+1. **Quelle différence entre `computed`, `linkedSignal` et un `effect` qui fait un `set` ?**
+   `computed` dérive une valeur en lecture seule : elle se recalcule quand ses dépendances changent, on ne peut pas
+   l'écrire. `linkedSignal` dérive aussi une valeur d'une source, mais reste **modifiable** : l'utilisateur peut
+   la changer, et elle se réinitialise quand la source change (la quantité revient à 1 au changement de produit).
+   Un `effect` qui fait un `set` obtient le même résultat, mais l'état est modifié depuis deux endroits, le lien est
+   caché, et on risque des boucles. `effect` est réservé aux effets de bord vers l'extérieur (stockage, logs,
+   bibliothèque non-Angular).
+
+2. **Signal ou Observable : lequel choisir, et comment passer de l'un à l'autre ?**
+   Un signal représente un **état** qui a toujours une valeur, lue de façon synchrone : c'est le bon outil pour l'état
+   d'écran, surtout en zoneless. Un Observable représente un **flux d'événements dans le temps** (HTTP, frappes,
+   minuteurs) et offre les opérateurs RxJS (`debounceTime`, `switchMap`…). `toSignal` transforme un Observable en
+   signal pour l'afficher (avec `initialValue` et désabonnement automatique) ; `toObservable` fait l'inverse pour
+   appliquer des opérateurs temporels à un signal, comme la sauvegarde différée du panier.
+
+3. **Pourquoi ne modifie-t-on jamais un tableau sur place dans un signal ?**
+   Un signal compare l'ancienne et la nouvelle valeur par référence (`Object.is`). Après un `push` ou un
+   `line.quantity++` suivi de `set(memeTableau)`, il voit la même référence et ne prévient personne : l'écran ne
+   bouge pas, et les `computed` ne se recalculent pas. Il faut créer un nouveau tableau (`map`, `filter`,
+   `[...lines, x]`) et de nouveaux objets (`{ ...line, quantity: ... }`). Typer le signal `readonly CartLine[]`
+   fait refuser `push` par le compilateur. Bonus : une donnée partagée modifiée sur place peut aussi contaminer
+   d'autres composants ou d'autres tests.
