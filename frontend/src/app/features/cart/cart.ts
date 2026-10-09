@@ -1,9 +1,10 @@
 import { CurrencyPipe } from '@angular/common';
+import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
+import { loadDraft, saveDraft } from './cart-draft';
 import { CartLine, MAX_TOTAL_CENTS, exceedsMax, lineTotalCents, totalCents } from './cart-line';
-import { DRAFT_KEY, loadDraft, saveDraft } from './cart-draft';
 import { CatalogService } from './catalog-service';
-import { Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 
 /** Panier de départ : 9 975,00 €. Deux BOOK de plus atteignent exactement le plafond. */
 const INITIAL_LINES: readonly CartLine[] = [
@@ -24,19 +25,15 @@ export class Cart {
 
   protected readonly selectedCode = signal('');
 
+  // l'état : un signal de lignes, initialisé avec INITIAL_LINES
+  protected readonly lines = signal<readonly CartLine[]>(loadDraft(localStorage) ?? INITIAL_LINES);
+
   protected readonly quantity = linkedSignal({
     // le signal surveillé
     source: this.selectedCode,
     // la valeur à prendre quand la source change
     computation: () => 1,
   });
-
-  constructor() {
-    effect(() =>
-      /* sauvegarder this.lines() dans localStorage */
-      saveDraft(localStorage, this.lines()),
-    );
-  }
 
   protected readonly selectedProduct = computed(() =>
     this.products().find((product) => product.code === this.selectedCode()),
@@ -56,6 +53,19 @@ export class Cart {
 
     return !exceedsMax(this.total() + addedCents);
   });
+
+  constructor() {
+    toObservable(this.lines) // le signal devient un flux
+      .pipe(debounceTime(500)) // on attend 500 ms de calme
+      .subscribe((lines) => saveDraft(localStorage, lines)); // puis on sauvegarde
+  }
+
+  // constructor() {
+  //   effect(() =>
+  //     /* sauvegarder this.lines() dans localStorage */
+  //     saveDraft(localStorage, this.lines()),
+  //   );
+  // }
 
   protected add(): void {
     const product = this.selectedProduct();
@@ -94,9 +104,6 @@ export class Cart {
       return;
     }
   }
-
-  // l'état : un signal de lignes, initialisé avec INITIAL_LINES
-  protected readonly lines = signal<readonly CartLine[]>(loadDraft(localStorage) ?? INITIAL_LINES);
 
   // deux computed, en centimes : le total
   protected readonly total = computed<number>(() => {

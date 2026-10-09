@@ -2,5 +2,9 @@
   "chat.disableAIFeatures": true,
   "editor.inlineSuggest.enabled": false,
   "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.addMissingImports.ts": "explicit",
+    "source.organizeImports": "explicit"
+  }
 }
