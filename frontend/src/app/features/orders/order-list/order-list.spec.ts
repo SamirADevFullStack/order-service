@@ -17,7 +17,7 @@ describe('OrderList', () => {
     fixture = TestBed.createComponent(OrderList);
     page = fixture.nativeElement as HTMLElement;
     http = TestBed.inject(HttpTestingController);
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
 
   afterEach(() => http.verify());
@@ -75,5 +75,94 @@ describe('OrderList', () => {
     expect(page.querySelector('[data-testid="error"]')?.textContent).toContain(
       'Impossible de charger',
     );
+  });
+
+  describe('pagination', () => {
+    function pageOf(page: number, totalElements: number): OrderPage {
+      return {
+        content: [
+          {
+            id: 'p' + page,
+            status: 'CREATED',
+            totalAmount: 10,
+            currency: 'EUR',
+            createdAt: '2026-10-10T12:00:00Z',
+          },
+        ],
+        page,
+        size: 20,
+        totalElements,
+        totalPages: Math.ceil(totalElements / 20),
+      };
+    }
+
+    function button(name: string): HTMLButtonElement {
+      const found = Array.from(page.querySelectorAll('button')).find(
+        (b) => b.textContent?.trim() === name,
+      );
+      if (!found) {
+        throw new Error(`Bouton « ${name} » introuvable`);
+      }
+      return found;
+    }
+
+    it('charge la page suivante quand on clique sur « Suivant »', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 25));
+      await fixture.whenStable();
+      expect(page.querySelector('[data-testid="page-info"]')?.textContent).toContain(
+        'Page 1 sur 2',
+      );
+      expect(button('Précédent').disabled).toBe(true);
+
+      button('Suivant').click();
+      await fixture.whenStable();
+      http.expectOne('/api/orders?page=1&size=20').flush(pageOf(1, 25));
+      await fixture.whenStable();
+
+      expect(page.querySelector('[data-testid="page-info"]')?.textContent).toContain(
+        'Page 2 sur 2',
+      );
+      expect(button('Suivant').disabled).toBe(true);
+    });
+
+    it("annule la requête précédente si l'utilisateur change de page avant la réponse (switchMap)", async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 65));
+      await fixture.whenStable();
+
+      button('Suivant').click();
+      await fixture.whenStable();
+      const pageTwo = http.expectOne('/api/orders?page=1&size=20');
+      button('Suivant').click();
+      await fixture.whenStable();
+      http.expectOne('/api/orders?page=2&size=20').flush(pageOf(2, 65));
+      await fixture.whenStable();
+
+      expect(pageTwo.cancelled).toBe(true);
+      expect(page.querySelector('[data-testid="page-info"]')?.textContent).toContain(
+        'Page 3 sur 4',
+      );
+    });
+
+    it('reste utilisable après une erreur : la page suivante se charge encore', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 45));
+      await fixture.whenStable();
+
+      button('Suivant').click();
+      await fixture.whenStable();
+      http
+        .expectOne('/api/orders?page=1&size=20')
+        .flush(null, { status: 500, statusText: 'Erreur' });
+      await fixture.whenStable();
+      expect(page.querySelector('[data-testid="error"]')).not.toBeNull();
+
+      fixture.componentInstance['page'].set(2);
+      await fixture.whenStable();
+      http.expectOne('/api/orders?page=2&size=20').flush(pageOf(2, 45));
+      await fixture.whenStable();
+
+      expect(page.querySelector('[data-testid="page-info"]')?.textContent).toContain(
+        'Page 3 sur 3',
+      );
+    });
   });
 });

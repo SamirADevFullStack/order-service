@@ -16,6 +16,17 @@
             <li class="empty" data-testid="empty">Vous n'avez encore passé aucune commande.</li>
           }
         </ul>
+        @if (view.page.totalPages > 1) {
+          <nav class="pagination" aria-label="Pagination des commandes">
+            <button type="button" [disabled]="page() === 0" (click)="previous()">Précédent</button>
+            <span data-testid="page-info"
+              >Page {{ page() + 1 }} sur {{ view.page.totalPages }}</span
+            >
+            <button type="button" [disabled]="page() >= view.page.totalPages - 1" (click)="next()">
+              Suivant
+            </button>
+          </nav>
+        }
       }
       @case ('error') {
         <p class="error" role="alert" data-testid="error">{{ view.message }}</p>
