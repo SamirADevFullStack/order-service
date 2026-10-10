@@ -1,6 +1,7 @@
 import { AsyncPipe, CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { Observable, catchError, map, of, switchMap } from 'rxjs';
 import { OrderService } from '../order-service';
 import { OrderPage } from '../order.model';
@@ -10,7 +11,7 @@ type OrderListView = { kind: 'loaded'; page: OrderPage } | { kind: 'error'; mess
 
 @Component({
   selector: 'app-order-list',
-  imports: [AsyncPipe, CurrencyPipe, DatePipe],
+  imports: [AsyncPipe, CurrencyPipe, DatePipe, RouterLink],
   templateUrl: './order-list.html',
   styleUrl: './order-list.scss',
 })

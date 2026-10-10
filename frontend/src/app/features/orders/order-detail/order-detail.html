@@ -1,0 +1,54 @@
+<section class="detail">
+  <a class="back" routerLink="/commandes">← Mes commandes</a>
+
+  @if (view$ | async; as view) {
+    @switch (view.kind) {
+      @case ('loaded') {
+        <h1>Commande du {{ view.order.createdAt | date: 'dd/MM/yyyy à HH:mm' }}</h1>
+        <p class="meta">
+          <span class="status">{{ view.order.status }}</span>
+          <span>Client {{ view.order.customerId }}</span>
+        </p>
+
+        <table class="lines">
+          <thead>
+            <tr>
+              <th scope="col">Produit</th>
+              <th scope="col" class="num">Quantité</th>
+              <th scope="col" class="num">Prix unitaire</th>
+              <th scope="col" class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of view.order.lines; track line.productCode) {
+              <tr data-testid="line">
+                <td>{{ line.productCode }}</td>
+                <td class="num">{{ line.quantity }}</td>
+                <td class="num">{{ line.unitPrice | currency: view.order.currency }}</td>
+                <td class="num">{{ line.lineTotal | currency: view.order.currency }}</td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colspan="3">Total de la commande</th>
+              <td class="num total" data-testid="total">
+                {{ view.order.totalAmount | currency: view.order.currency }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      }
+      @case ('not-found') {
+        <p class="not-found" data-testid="not-found">
+          Commande introuvable. Elle n'existe pas, ou plus.
+        </p>
+      }
+      @case ('error') {
+        <p class="error" role="alert" data-testid="error">{{ view.message }}</p>
+      }
+    }
+  } @else {
+    <p class="loading" data-testid="loading">Chargement de la commande…</p>
+  }
+</section>

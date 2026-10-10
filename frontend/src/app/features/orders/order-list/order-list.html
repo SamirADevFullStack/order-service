@@ -8,9 +8,11 @@
         <ul class="list">
           @for (order of view.page.content; track order.id) {
             <li class="order" data-testid="order">
-              <span class="date">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
-              <span class="status">{{ order.status }}</span>
-              <span class="amount">{{ order.totalAmount | currency: order.currency }}</span>
+              <a class="order-link" [routerLink]="['/commandes', order.id]">
+                <span class="date">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+                <span class="status">{{ order.status }}</span>
+                <span class="amount">{{ order.totalAmount | currency: order.currency }}</span>
+              </a>
             </li>
           } @empty {
             <li class="empty" data-testid="empty">Vous n'avez encore passé aucune commande.</li>

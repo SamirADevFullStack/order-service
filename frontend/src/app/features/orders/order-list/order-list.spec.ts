@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { OrderPage } from '../order.model';
 import { OrderList } from './order-list';
 
@@ -12,7 +13,8 @@ describe('OrderList', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [OrderList],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      // RouterLink (les lignes sont des liens vers le détail) a besoin du routeur
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
     fixture = TestBed.createComponent(OrderList);
     page = fixture.nativeElement as HTMLElement;

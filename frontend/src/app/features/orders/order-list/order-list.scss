@@ -21,18 +21,50 @@ h1 {
   padding: 0;
 }
 
-/* Une commande = une grille à 3 colonnes : date, statut, montant. */
 .order {
-  display: grid;
-  grid-template-columns: 1fr auto 8rem;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
   border-bottom: 1px solid var(--color-border);
 }
 
 .order:last-child {
   border-bottom: none;
+}
+
+/* Toute la ligne est cliquable : le lien est une grille à 4 colonnes (date, statut, montant, flèche). */
+.order-link {
+  display: grid;
+  grid-template-columns: 1fr auto 8rem 1.25rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.order-link::after {
+  content: '›';
+  color: var(--color-muted);
+  font-size: 1.25rem;
+  text-align: right;
+  transition:
+    transform 0.15s,
+    color 0.15s;
+}
+
+.order-link:hover {
+  background: var(--color-bg);
+}
+
+.order-link:hover::after {
+  color: var(--color-primary);
+  transform: translateX(3px);
+}
+
+.order-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .date {
@@ -101,8 +133,12 @@ h1 {
 }
 
 @media (max-width: 600px) {
-  .order {
+  .order-link {
     grid-template-columns: 1fr auto;
+  }
+
+  .order-link::after {
+    display: none;
   }
 
   .amount {
