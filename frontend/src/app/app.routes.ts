@@ -8,5 +8,10 @@ export const routes: Routes = [
     /* Chargement à la demande (lazy) et non au démarrage (eager) en lieu et place de component: Cart*/
     loadComponent: () => import('./features/cart/cart').then((m) => m.Cart),
   },
+  {
+    path: 'commandes',
+    title: 'Mes commandes',
+    loadComponent: () => import('./features/orders/order-list/order-list').then((m) => m.OrderList),
+  },
   { path: '**', redirectTo: 'panier' },
 ];

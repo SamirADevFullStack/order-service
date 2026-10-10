@@ -1,0 +1,27 @@
+<section class="orders">
+  <h1>Mes commandes</h1>
+
+  @if (view$ | async; as view) {
+    @switch (view.kind) {
+      @case ('loaded') {
+        <p class="count" data-testid="count">{{ view.page.totalElements }} commandes</p>
+        <ul class="list">
+          @for (order of view.page.content; track order.id) {
+            <li class="order" data-testid="order">
+              <span class="date">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+              <span class="status">{{ order.status }}</span>
+              <span class="amount">{{ order.totalAmount | currency: order.currency }}</span>
+            </li>
+          } @empty {
+            <li class="empty" data-testid="empty">Vous n'avez encore passé aucune commande.</li>
+          }
+        </ul>
+      }
+      @case ('error') {
+        <p class="error" role="alert" data-testid="error">{{ view.message }}</p>
+      }
+    }
+  } @else {
+    <p class="loading" data-testid="loading">Chargement de vos commandes…</p>
+  }
+</section>

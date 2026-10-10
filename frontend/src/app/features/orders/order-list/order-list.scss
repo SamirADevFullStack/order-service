@@ -1,0 +1,83 @@
+.orders {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.count {
+  margin: 0 0 1rem;
+  color: var(--color-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Une commande = une grille à 3 colonnes : date, statut, montant. */
+.order {
+  display: grid;
+  grid-template-columns: 1fr auto 8rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.order:last-child {
+  border-bottom: none;
+}
+
+.date {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le statut est une étiquette arrondie. */
+.status {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.amount {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty,
+.loading {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.error {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+@media (max-width: 600px) {
+  .order {
+    grid-template-columns: 1fr auto;
+  }
+
+  .amount {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
