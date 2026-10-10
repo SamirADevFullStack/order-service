@@ -1,14 +1,18 @@
 package com.banque.order.infrastructure.out.persistence;
 
 import com.banque.order.application.pagination.PageQuery;
+import com.banque.order.application.pagination.PageResult;
 import com.banque.order.application.port.out.OrderRepository;
 import com.banque.order.domain.model.Order;
 import com.banque.order.domain.model.OrderId;
-import java.util.Optional;
-
-import com.banque.order.application.pagination.PageResult;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * ADAPTATEUR SORTANT DE PERSISTANCE : implémente le port OrderRepository avec JPA.
@@ -38,9 +42,19 @@ public class OrderJpaAdapter implements OrderRepository {
         return jpaRepository.findById(id.value()).map(mapper::toDomain);
     }
 
-    // TODO 2c : implémentation provisoire, pour que le projet compile pendant 2b
     @Override
+    @Transactional(readOnly = true)
     public PageResult<Order> findAll(PageQuery query) {
-        throw new UnsupportedOperationException("À implémenter en 2c");
+        // 1. PageQuery (à nous) → PageRequest (Spring Data), AVEC le tri promis par le port
+        PageRequest pageable = PageRequest.of(query.page(), query.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // 2. la requête : Spring Data fait le SELECT paginé ET le COUNT(*) pour le total
+        Page<OrderJpaEntity> page = jpaRepository.findAll(pageable);
+
+        // 3. entités JPA → objets du domaine, avec le mapper existant
+        List<Order> orders = page.getContent().stream().map(mapper::toDomain).toList();
+
+        // 4. Page (Spring) → PageResult (à nous)
+        return new PageResult<>(orders, query.page(), query.size(), page.getTotalElements());
     }
 }
