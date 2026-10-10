@@ -37,6 +37,21 @@ paths:
             minimum: 1
             maximum: 100
             default: 20
+        - name: q
+          in: query
+          description: >-
+            Texte recherché, sans tenir compte des majuscules : dans l'identifiant du client,
+            ou dans le code d'un produit commandé. Absent ou vide : aucune recherche.
+          required: false
+          schema:
+            type: string
+            maxLength: 50
+        - name: sort
+          in: query
+          description: Ordre de la liste
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderSort'
       responses:
         '200':
           description: Une page de commandes
@@ -279,6 +294,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderLine'
+    OrderSort:
+      type: string
+      description: >-
+        Ordre de la liste. CREATED_AT_DESC : les plus récentes d'abord (par défaut).
+        CREATED_AT_ASC : les plus anciennes d'abord. TOTAL_DESC / TOTAL_ASC : par montant total.
+      enum:
+        - CREATED_AT_DESC
+        - CREATED_AT_ASC
+        - TOTAL_DESC
+        - TOTAL_ASC
+      default: CREATED_AT_DESC
     ApiError:
       type: object
       description: Erreur au format Problem Details (RFC 7807)
