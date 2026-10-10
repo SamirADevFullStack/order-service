@@ -3,20 +3,40 @@ header {
 }
 
 nav {
+  display: flex;
+  gap: 0.5rem;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 1rem;
 }
 
+/* Chaque lien de navigation ressemble à un onglet ; l'onglet actif est mis en avant. */
 nav a {
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius);
   color: #ffffff;
   text-decoration: none;
   opacity: 0.85;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+}
+
+nav a:hover {
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 1;
 }
 
 nav a.active {
-  font-weight: bold;
+  background: #ffffff;
+  color: var(--color-primary);
+  font-weight: 600;
   opacity: 1;
+}
+
+nav a:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 main {

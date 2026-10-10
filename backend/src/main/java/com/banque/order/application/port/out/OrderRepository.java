@@ -1,5 +1,7 @@
 package com.banque.order.application.port.out;
 
+import com.banque.order.application.pagination.PageQuery;
+import com.banque.order.application.pagination.PageResult;
 import com.banque.order.domain.model.Order;
 import com.banque.order.domain.model.OrderId;
 import java.util.Optional;
@@ -14,4 +16,6 @@ public interface OrderRepository {
     Order save(Order order);
 
     Optional<Order> findById(OrderId id);
+
+    public PageResult<Order> findAll(PageQuery query);
 }

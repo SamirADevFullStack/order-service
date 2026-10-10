@@ -207,3 +207,119 @@ le plafond de 10 000 € (même règle que `Order.create` côté back) bloque le
    `[...lines, x]`) et de nouveaux objets (`{ ...line, quantity: ... }`). Typer le signal `readonly CartLine[]`
    fait refuser `push` par le compilateur. Bonus : une donnée partagée modifiée sur place peut aussi contaminer
    d'autres composants ou d'autres tests.
+
+## Étape 2 : lister et consulter les commandes (2026-10-09 → 2026-10-10)
+
+Objectif : `GET /api/orders` (paginé) et `GET /api/orders/{id}` côté back, en API-first et en hexagonal ;
+côté front, une page « Mes commandes » paginée et une page de détail, branchées sur le vrai back.
+
+### Notions vues : back
+
+- **API-first** : le contrat `order-api.yaml` d'abord. `operationId` donne le nom de la méthode Java, `tags` l'interface
+  (`OrdersApi`), `in: query` / `in: path` les annotations `@RequestParam` / `@PathVariable`, `minimum` / `maximum`
+  les `@Min` / `@Max`. `required` sur les champs d'une réponse est une promesse faite au front. Après la modification
+  du contrat, le build échoue tant que le contrôleur n'implémente pas les nouvelles méthodes : le code ne peut pas dériver.
+- **Deux schémas pour une même ressource** : `OrderSummary` (liste, sans les lignes) et `OrderDetail` (avec les lignes).
+  `OrderPage` est un objet de pagination à nous, et non la `Page` de Spring, dont la sérialisation JSON n'est pas un contrat stable.
+- **La pagination dans l'hexagone** : `PageQuery` et `PageResult<T>` sont des types à nous, en Java pur, dans
+  `application.pagination`. `PageQuery` se valide dans son constructeur compact (défense en profondeur).
+  `PageResult.totalPages()` arrondit au supérieur ; `map(...)` transforme le contenu en gardant la pagination.
+  Seul l'adaptateur JPA connaît `PageRequest`, `Page` et `Sort`.
+- **Le tri fait partie du contrat du port** : la Javadoc de `OrderRepository.findAll` le promet, l'adaptateur le respecte
+  (`Sort.by(DESC, "createdAt")`, nom du champ Java et non de la colonne).
+- **Cas d'usage de lecture** : `ListOrdersUseCase` / `GetOrderUseCase` (ports entrants, une méthode chacun),
+  `ListOrdersService` / `GetOrderService` sans Spring, déclarés en `@Bean` dans `BeanConfiguration` avec l'interface
+  comme type de retour. `findById(id).orElseThrow(() -> new OrderNotFoundException(id))` : la lambda ne crée
+  l'exception que si nécessaire.
+- **Exceptions métier → HTTP dans l'adaptateur** : `OrderNotFoundException` → 404, `ConstraintViolationException` → 400,
+  au format ProblemDetail dans `RestExceptionHandler`. Le service ne connaît pas HTTP.
+- **Un mapper à chaque frontière** : `OrderJpaEntity` → `Order` (adaptateur JPA), `Order` → `OrderSummary` /
+  `OrderDetail` et `PageResult<Order>` → `OrderPage` (mapper REST). Conflit de noms `OrderLine` (domaine / DTO) :
+  on importe l'une, et on écrit le nom complet de l'autre.
+- **`@Transactional(readOnly = true)` dans l'adaptateur** : indispensable, pas seulement une optimisation. Les lignes
+  sont chargées à la demande (*lazy*) pendant la conversion en `Order` ; sans transaction, et avec `open-in-view: false`,
+  on aurait une `LazyInitializationException`.
+- **Trois niveaux de tests** : services avec Mockito (`@InjectMocks`, `when(...).thenReturn(...)`, `isSameAs`) ;
+  adaptateur avec `@DataJpaTest` sur une vraie base H2 ; contrôleur avec MockMvc (`standaloneSetup`, `jsonPath`)
+  et `@WebMvcTest` + `@MockitoBean` pour la validation des paramètres.
+- **Profil `dev`** : `DevDataLoader` (`@Profile("dev")`, `ApplicationRunner`) crée 25 commandes en passant par le cas
+  d'usage, donc par les règles métier et l'Outbox. Démarrage : `mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`
+  (guillemets obligatoires sous PowerShell).
+
+### Notions vues : front
+
+- **Proxy de développement** (`proxy.conf.json` + `proxyConfig` dans `angular.json`) : le front appelle `/api/...` sur sa
+  propre origine, `ng serve` transmet au back. Pas de CORS à configurer, et le même code fonctionnera derrière Nginx
+  en production. Le proxy n'est lu qu'au démarrage de `ng serve`.
+- **`provideHttpClient(withFetch())`** : chaque `provideXxx(...)` reçoit ses propres options `withYyy()`.
+- **Modèles TypeScript** qui reflètent le contrat (`order.model.ts`) : pas de champ facultatif grâce aux `required`,
+  dates en `string` ISO 8601 (JSON n'a pas de type date). `http.get<OrderPage>(...)` est un transtypage, pas une validation.
+- **Un Observable HTTP est paresseux** : rien ne part sans abonnement, et chaque abonnement renvoie une requête.
+- **Opérateurs RxJS** : `pipe`, `map`, `catchError` (une erreur termine l'Observable : on la remplace par une valeur
+  affichable), `of`, `switchMap`.
+- **Union discriminée + `@switch`** : `{ kind: 'loaded'; page } | { kind: 'error'; message }`. Dans chaque `@case`,
+  le compilateur de templates sait quels champs existent. Le chargement est l'absence de valeur (`@else`).
+- **Pipe `async`** : s'abonne, affiche, rafraîchit (zoneless), se désabonne. Un seul `| async` par Observable, puis `as`,
+  sinon chaque usage relance une requête. Comparé à `toSignal` : même rôle, mais côté template et sans valeur initiale.
+- **Pagination** : `page = signal(0)` → `toObservable(page)` → `switchMap` vers `listCommandes(page)`.
+  `switchMap` annule la requête précédente si le client change de page avant la réponse.
+- **Détail** : route `commandes/:id`, `ActivatedRoute.paramMap` (un Observable, car le composant est réutilisé quand seul
+  le paramètre change), `switchMap` vers `getCommande(id)`. `HttpErrorResponse.status` distingue 404 (« Commande
+  introuvable ») et 500 (« Réessayez plus tard »). Import renommé `OrderDetail as Order` (le composant et le modèle
+  portaient le même nom).
+- **Tests HTTP** : `provideHttpClientTesting()` et `HttpTestingController` (`expectOne`, `flush`, `expectNone`,
+  `verify`, `request.cancelled`), faux `ActivatedRoute` avec `convertToParamMap`.
+
+### Pièges rencontrés
+
+- **La 500 cachée par `@Validated`** : le générateur ajoute `@Validated` sur `OrdersApi`. La validation de `size=500`
+  passe alors par un proxy Spring et lève une `ConstraintViolationException` que personne ne traduisait : le client
+  recevait une 500 au lieu de la 400 promise. Et un test `standaloneSetup` ne le voit pas (pas de proxy) : il faut
+  `@WebMvcTest`. Corrigé par un handler dans `RestExceptionHandler`.
+- **Des tests unitaires verts ne prouvent pas que l'application démarre** : `ListOrdersUseCase` était injecté dans le
+  contrôleur sans bean déclaré. Les tests (contrôleur créé à la main) passaient, `spring-boot:run` échouait avec
+  `required a bean of type 'ListOrdersUseCase' that could not be found` (« Parameter 2 » = le 3e paramètre).
+- **Le problème N+1** : une page de 20 commandes = 1 requête + 1 `COUNT` + 20 requêtes pour les lignes. `JOIN FETCH` ou
+  `@EntityGraph` avec pagination fait paginer Hibernate en mémoire (`HHH90003004`) ; solutions propres :
+  `hibernate.default_batch_fetch_size`, ou stocker le total dans la table.
+- **Mockito** : `thenAnswer(invocation -> invocation.getArgument(0))` ne convient que si la méthode renvoie le type
+  qu'elle reçoit (`save`), pas pour `findAll(PageQuery) → PageResult` (`ClassCastException`). `thenReturn(order)`
+  au lieu de `thenReturn(Optional.of(order))` ne compile pas. `findAll(query)` plutôt que `any(...)` pour que le test
+  attrape une mauvaise requête.
+- **Un test sans assertion passe toujours** (méthodes de test laissées vides avec seulement des commentaires).
+- **Java** : `throw new IllegalArgumentException(...)` et non `throw IllegalArgumentException` ; un fichier doit porter
+  le nom de sa classe publique ; le package doit correspondre au dossier (attention à l'affichage compacté
+  d'IntelliJ) ; `orElseThrow` attend une lambda ; `+ id` sur un `record` affiche `OrderId[value=…]`.
+- **`.lines(...)` oublié dans `toDetail`** : aucun compilateur ne le signale. Indice : la méthode privée `toLine`
+  apparaissait en gris. Le test sur `$.lines[0]` l'aurait attrapé.
+- **`Port 8080 was already in use`** : une instance précédente tournait encore dans IntelliJ (`netstat -ano | findstr :8080`).
+- **Kafka absent** : `Could not configure topics` n'est pas bloquant (l'API REST fonctionne), mais ralentit le
+  démarrage ; `docker compose up -d` à la racine. Les événements attendent dans l'Outbox.
+- **`catchError` à l'extérieur du `switchMap`** : la première erreur termine le flux principal, et la pagination ne
+  répond plus. Il va dans le pipe interne.
+- **`RouterLink` dans un composant → `provideRouter([])` dans ses tests**, sinon `NG0201: No provider found for ActivatedRoute`.
+- **La traduction automatique de Chrome** sur GitHub : `frontend` devenait « l'extrémité avant ».
+
+### Questions d'entretien
+
+1. **Pourquoi ne pas utiliser `Pageable` et `Page` de Spring Data dans le port de ton cas d'usage ?**
+   La couche `application` doit rester indépendante du framework : c'est la règle de l'hexagonal, vérifiée par ArchUnit.
+   On définit donc des types à nous (`PageQuery`, `PageResult`), et l'adaptateur JPA traduit `PageQuery` → `PageRequest`
+   (avec le tri promis par le port) et `Page<Entity>` → `PageResult<Order>`. Bonus : l'API REST expose aussi son propre
+   objet `OrderPage`, défini dans le contrat, car la sérialisation JSON de `PageImpl` n'est pas un format stable.
+   Le jour où l'on change de base, seul l'adaptateur change.
+
+2. **`switchMap`, `mergeMap`, `concatMap`, `exhaustMap` : lequel pour une pagination ou une recherche, et pourquoi ?**
+   `switchMap` : à chaque nouvelle demande, il annule la requête en cours. Seule la dernière compte, et une ancienne
+   réponse arrivée en retard ne peut pas écraser la nouvelle. `mergeMap` lance tout en parallèle (l'ordre des réponses
+   n'est pas garanti), `concatMap` les enchaîne dans l'ordre (sauvegardes successives), `exhaustMap` ignore les
+   nouvelles demandes tant que la précédente n'est pas finie (bouton « Payer »). Piège associé : le `catchError` doit
+   être dans le pipe interne du `switchMap`, sinon la première erreur coupe tout le flux.
+
+3. **Ton contrat déclare `maximum: 100` sur `size`. Comment t'assures-tu qu'un client reçoit bien une 400 ?**
+   Le générateur traduit la borne en `@Max(100)`, mais il ajoute aussi `@Validated` sur l'interface : la validation
+   passe par un proxy Spring et lève une `ConstraintViolationException`, qui donnerait une 500 si personne ne la
+   traduit. Il faut un `@ExceptionHandler` qui la convertit en 400 ProblemDetail, et un test qui charge la vraie
+   configuration Spring MVC (`@WebMvcTest`) : un test `standaloneSetup` ne passe pas par le proxy et ne verrait rien.
+   En plus, `PageQuery` valide ses bornes dans son constructeur, en défense en profondeur, si le cas d'usage est
+   appelé par autre chose que le REST.

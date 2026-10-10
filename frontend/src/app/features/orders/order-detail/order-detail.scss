@@ -1,0 +1,122 @@
+.detail {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+/* Lien de retour vers la liste */
+.back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  color: var(--color-muted);
+}
+
+.status {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Tableau des lignes de la commande */
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.lines th,
+.lines td {
+  padding: 0.65rem 0.5rem;
+  text-align: left;
+}
+
+.lines thead th {
+  border-bottom: 2px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.lines tbody tr {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lines tbody td:first-child {
+  font-weight: 600;
+}
+
+.lines .num {
+  text-align: right;
+}
+
+.lines tfoot th,
+.lines tfoot td {
+  padding-top: 1rem;
+  font-size: 1.1rem;
+}
+
+.lines tfoot th {
+  text-align: right;
+  font-weight: 600;
+}
+
+.total {
+  font-weight: 700;
+}
+
+.loading,
+.not-found {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* Sur petit écran, on masque la colonne « Prix unitaire » pour garder le tableau lisible. */
+@media (max-width: 600px) {
+  .lines th:nth-child(3),
+  .lines td:nth-child(3) {
+    display: none;
+  }
+
+  .lines tfoot th {
+    text-align: left;
+  }
+}
