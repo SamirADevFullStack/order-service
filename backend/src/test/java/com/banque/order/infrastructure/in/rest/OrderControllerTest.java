@@ -3,6 +3,8 @@ package com.banque.order.infrastructure.in.rest;
 import com.banque.order.application.pagination.PageQuery;
 import com.banque.order.application.pagination.PageResult;
 import com.banque.order.application.port.in.CreateOrderUseCase;
+import com.banque.order.application.search.OrderSearchCriteria;
+import com.banque.order.application.search.SortOrder;
 import com.banque.order.application.port.in.GetOrderUseCase;
 import com.banque.order.application.port.in.ListOrdersUseCase;
 import com.banque.order.domain.exception.InvalidOrderException;
@@ -93,9 +95,20 @@ class OrderControllerTest {
     }
 
     @Test
+    void transmet_la_recherche_et_le_tri_au_cas_d_usage() throws Exception {
+        // q (avec espaces) et sort=TOTAL_DESC (contrat) → OrderSearchCriteria("pen", HIGHEST_TOTAL_FIRST) (cœur)
+        when(listOrdersUseCase.list(new OrderSearchCriteria("pen", SortOrder.HIGHEST_TOTAL_FIRST), new PageQuery(0, 20)))
+                .thenReturn(new PageResult<>(List.of(sampleOrder()), 0, 20, 1));
+
+        mockMvc.perform(get("/api/orders").param("q", "  pen ").param("sort", "TOTAL_DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     void liste_les_commandes_page_par_page() throws Exception {
         Order order = sampleOrder();
-        when(listOrdersUseCase.list(new PageQuery(1, 20))).thenReturn(new PageResult<>(List.of(order), 1, 20, 21));
+        when(listOrdersUseCase.list(OrderSearchCriteria.none(), new PageQuery(1, 20))).thenReturn(new PageResult<>(List.of(order), 1, 20, 21));
 
         mockMvc.perform(get("/api/orders").param("page", "1"))
                 .andExpect(status().isOk())

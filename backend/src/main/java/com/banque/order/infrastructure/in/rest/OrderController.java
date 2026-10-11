@@ -39,8 +39,7 @@ public class OrderController implements OrdersApi {
 
     @Override
     public ResponseEntity<OrderPage> listOrders(Integer page, Integer size, String q, OrderSort sort) {
-        // TODO 3d : transmettre q et sort au cas d'usage
-        PageResult<Order> orders = listOrdersUseCase.list(new PageQuery(page, size));
+        PageResult<Order> orders = listOrdersUseCase.list(mapper.toCriteria(q, sort), new PageQuery(page, size));
         return ResponseEntity.ok(mapper.toPage(orders));
     }
 

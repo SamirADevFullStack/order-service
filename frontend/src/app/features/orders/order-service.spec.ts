@@ -44,4 +44,14 @@ describe('OrderService', () => {
     service.listCommandes();
     http.expectNone('/api/orders?page=0&size=20');
   });
+
+  it('ajoute la recherche (sans les espaces autour) et le tri quand ils sont utiles', () => {
+    service.listCommandes(0, 20, '  pen ', 'TOTAL_ASC').subscribe();
+    http.expectOne('/api/orders?page=0&size=20&q=pen&sort=TOTAL_ASC').flush({});
+  });
+
+  it("n'envoie ni recherche vide ni tri par défaut", () => {
+    service.listCommandes(0, 20, '   ', 'CREATED_AT_DESC').subscribe();
+    http.expectOne('/api/orders?page=0&size=20').flush({});
+  });
 });

@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import com.banque.order.application.pagination.PageQuery;
 import com.banque.order.application.pagination.PageResult;
 import com.banque.order.application.port.out.OrderRepository;
+import com.banque.order.application.search.OrderSearchCriteria;
+import com.banque.order.application.search.SortOrder;
 import com.banque.order.domain.model.Order;
 
 import java.time.Clock;
@@ -39,12 +41,13 @@ class ListOrdersServiceTest {
     @Test
     void renvoie_la_page_fournie_par_le_port_sortant() {
         // given : le port sortant renverra cette page pour cette demande
+        OrderSearchCriteria criteria = new OrderSearchCriteria("pen", SortOrder.HIGHEST_TOTAL_FIRST);
         PageQuery query = new PageQuery(1, 20);
         PageResult<Order> page = new PageResult<>(List.of(), 1, 20, 25);
         // programmer le mock avec when(...).thenReturn(...)
-        when(orderRepository.findAll(query)).thenReturn(page);
+        when(orderRepository.findAll(criteria, query)).thenReturn(page);
         // when
-        PageResult<Order> result = service.list(query);
+        PageResult<Order> result = service.list(criteria, query);
 
         // then
         // vérifier que le résultat est EXACTEMENT la page du port (indice AssertJ : isSameAs)

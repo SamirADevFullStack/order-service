@@ -2,6 +2,8 @@ package com.banque.order.infrastructure.in.rest.mapper;
 
 import com.banque.order.application.pagination.PageResult;
 import com.banque.order.application.port.in.CreateOrderCommand;
+import com.banque.order.application.search.OrderSearchCriteria;
+import com.banque.order.application.search.SortOrder;
 import com.banque.order.domain.model.Money;
 import com.banque.order.domain.model.Order;
 import com.banque.order.infrastructure.in.rest.api.model.*;
@@ -34,6 +36,24 @@ public class OrderRestMapper {
                 .totalAmount(total.amount())
                 .currency(total.currency())
                 .createdAt(OffsetDateTime.ofInstant(order.createdAt(), ZoneOffset.UTC));
+    }
+
+    /** Paramètres de la requête (contrat) → critères de recherche (cœur). */
+    public OrderSearchCriteria toCriteria(String q, OrderSort sort) {
+        return new OrderSearchCriteria(q, toSortOrder(sort));
+    }
+
+    /** OrderSort (valeurs du contrat) → SortOrder (vocabulaire du métier). Le switch couvre toutes les valeurs. */
+    private SortOrder toSortOrder(OrderSort sort) {
+        if (sort == null) {
+            return null;   // les critères appliqueront l'ordre par défaut
+        }
+        return switch (sort) {
+            case CREATED_AT_DESC -> SortOrder.NEWEST_FIRST;
+            case CREATED_AT_ASC -> SortOrder.OLDEST_FIRST;
+            case TOTAL_DESC -> SortOrder.HIGHEST_TOTAL_FIRST;
+            case TOTAL_ASC -> SortOrder.LOWEST_TOTAL_FIRST;
+        };
     }
 
     public OrderPage toPage(PageResult<Order> page) {
