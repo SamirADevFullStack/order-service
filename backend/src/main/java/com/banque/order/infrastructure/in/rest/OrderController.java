@@ -8,10 +8,7 @@ import com.banque.order.application.port.in.ListOrdersUseCase;
 import com.banque.order.domain.model.Order;
 import com.banque.order.domain.model.OrderId;
 import com.banque.order.infrastructure.in.rest.api.OrdersApi;
-import com.banque.order.infrastructure.in.rest.api.model.CreateOrderRequest;
-import com.banque.order.infrastructure.in.rest.api.model.OrderDetail;
-import com.banque.order.infrastructure.in.rest.api.model.OrderPage;
-import com.banque.order.infrastructure.in.rest.api.model.OrderResponse;
+import com.banque.order.infrastructure.in.rest.api.model.*;
 import com.banque.order.infrastructure.in.rest.mapper.OrderRestMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,9 +38,9 @@ public class OrderController implements OrdersApi {
     }
 
     @Override
-    public ResponseEntity<OrderPage> listOrders(Integer page, Integer size) {
-        PageResult<Order> orders = listOrdersUseCase.list(new PageQuery(page, size));   // 1 + 2
-        return ResponseEntity.ok(mapper.toPage(orders));                                // 3
+    public ResponseEntity<OrderPage> listOrders(Integer page, Integer size, String q, OrderSort sort) {
+        PageResult<Order> orders = listOrdersUseCase.list(mapper.toCriteria(q, sort), new PageQuery(page, size));
+        return ResponseEntity.ok(mapper.toPage(orders));
     }
 
     @Override

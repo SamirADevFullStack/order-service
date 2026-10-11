@@ -53,4 +53,22 @@ class OrderControllerValidationTest {
 
         verifyNoInteractions(listOrdersUseCase);
     }
+
+    @Test
+    void refuse_un_tri_inconnu_avec_une_400() throws Exception {
+        // sort est une énumération dans le contrat : une valeur hors liste est refusée avant le contrôleur
+        mockMvc.perform(get("/api/orders").param("sort", "PRIX"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(listOrdersUseCase);
+    }
+
+    @Test
+    void refuse_une_recherche_de_plus_de_50_caracteres_avec_une_400() throws Exception {
+        mockMvc.perform(get("/api/orders").param("q", "x".repeat(51)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Paramètres invalides"));
+
+        verifyNoInteractions(listOrdersUseCase);
+    }
 }

@@ -11,6 +11,9 @@ describe('OrderList', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    // La recherche attend 300 ms sans frappe (debounceTime, qui utilise setInterval et Date).
+    // On ne simule QUE ces horloges : Angular garde ses vraies horloges pour rafraîchir l'écran.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     await TestBed.configureTestingModule({
       imports: [OrderList],
       // RouterLink (les lignes sont des liens vers le détail) a besoin du routeur
@@ -22,7 +25,10 @@ describe('OrderList', () => {
     await fixture.whenStable();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.useRealTimers();
+  });
 
   it('affiche « Chargement » tant que la réponse n’est pas arrivée', () => {
     expect(page.querySelector('[data-testid="loading"]')).not.toBeNull();
@@ -165,6 +171,132 @@ describe('OrderList', () => {
       expect(page.querySelector('[data-testid="page-info"]')?.textContent).toContain(
         'Page 3 sur 3',
       );
+    });
+  });
+
+  describe('recherche et tri', () => {
+    function pageOf(pageNumber: number, totalElements: number): OrderPage {
+      return {
+        content:
+          totalElements === 0
+            ? []
+            : [
+                {
+                  id: 'r' + pageNumber,
+                  status: 'CREATED',
+                  totalAmount: 10,
+                  currency: 'EUR',
+                  createdAt: '2026-10-10T12:00:00Z',
+                },
+              ],
+        page: pageNumber,
+        size: 20,
+        totalElements,
+        totalPages: Math.ceil(totalElements / 20),
+      };
+    }
+
+    /** Tape un texte dans le champ de recherche, comme l'utilisateur (un événement « input »). */
+    async function type(text: string): Promise<void> {
+      const input = page.querySelector<HTMLInputElement>(
+        'input[aria-label="Rechercher une commande"]',
+      );
+      if (!input) {
+        throw new Error('Champ de recherche introuvable');
+      }
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+    }
+
+    async function chooseSort(value: string): Promise<void> {
+      const select = page.querySelector<HTMLSelectElement>(
+        'select[aria-label="Trier les commandes"]',
+      );
+      if (!select) {
+        throw new Error('Liste de tri introuvable');
+      }
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    }
+
+    async function waitForDebounce(): Promise<void> {
+      await vi.advanceTimersByTimeAsync(300);
+      await fixture.whenStable();
+    }
+
+    function nextButton(): HTMLButtonElement {
+      const found = Array.from(page.querySelectorAll('button')).find(
+        (b) => b.textContent?.trim() === 'Suivant',
+      );
+      if (!found) {
+        throw new Error('Bouton « Suivant » introuvable');
+      }
+      return found;
+    }
+
+    it('attend 300 ms sans frappe, puis envoie UNE seule requête avec le texte final', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 25));
+      await fixture.whenStable();
+
+      await type('p');
+      await vi.advanceTimersByTimeAsync(100);
+      await type('pe');
+      await vi.advanceTimersByTimeAsync(100);
+      await type('pen');
+      // 200 ms depuis la première frappe : aucune requête de recherche n'est partie
+      http.expectNone((request) => request.params.has('q'));
+
+      await waitForDebounce();
+      http.expectOne('/api/orders?page=0&size=20&q=pen').flush(pageOf(0, 25));
+    });
+
+    it('ne relance pas la recherche si le texte final est le même', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 25));
+      await type('pen');
+      await waitForDebounce();
+      http.expectOne('/api/orders?page=0&size=20&q=pen').flush(pageOf(0, 25));
+
+      // efface une lettre puis la retape rapidement, et ajoute un espace : le texte recherché reste « pen »
+      await type('pe');
+      await type('pen ');
+      await waitForDebounce();
+      http.expectNone((request) => request.params.has('q'));
+    });
+
+    it('revient à la première page quand la recherche change (linkedSignal)', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 45));
+      await fixture.whenStable();
+      nextButton().click();
+      await fixture.whenStable();
+      http.expectOne('/api/orders?page=1&size=20').flush(pageOf(1, 45));
+
+      await type('pen');
+      await waitForDebounce();
+      http.expectOne('/api/orders?page=0&size=20&q=pen').flush(pageOf(0, 45));
+    });
+
+    it('trie la liste, sans attendre, et revient à la première page', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 45));
+      await fixture.whenStable();
+      nextButton().click();
+      await fixture.whenStable();
+      http.expectOne('/api/orders?page=1&size=20').flush(pageOf(1, 45));
+
+      await chooseSort('TOTAL_DESC');
+      http.expectOne('/api/orders?page=0&size=20&sort=TOTAL_DESC').flush(pageOf(0, 45));
+    });
+
+    it('affiche un message adapté quand la recherche ne trouve rien', async () => {
+      http.expectOne('/api/orders?page=0&size=20').flush(pageOf(0, 25));
+      await type('xyz');
+      await waitForDebounce();
+      http.expectOne('/api/orders?page=0&size=20&q=xyz').flush(pageOf(0, 0));
+      await fixture.whenStable();
+
+      expect(page.querySelector('[data-testid="no-result"]')?.textContent).toContain('xyz');
+      expect(page.querySelector('[data-testid="empty"]')).toBeNull();
     });
   });
 });

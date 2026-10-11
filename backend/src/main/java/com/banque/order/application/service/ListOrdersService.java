@@ -2,6 +2,7 @@ package com.banque.order.application.service;
 
 import com.banque.order.application.pagination.PageQuery;
 import com.banque.order.application.pagination.PageResult;
+import com.banque.order.application.search.OrderSearchCriteria;
 import com.banque.order.application.port.in.ListOrdersUseCase;
 import com.banque.order.application.port.out.OrderRepository;
 import com.banque.order.domain.model.Order;
@@ -16,8 +17,8 @@ public class ListOrdersService implements ListOrdersUseCase {
     }
 
     @Override
-    public PageResult<Order> list(PageQuery query) {
+    public PageResult<Order> list(OrderSearchCriteria criteria, PageQuery page) {
         // une seule ligne, qui délègue au port sortant
-        return orderRepository.findAll(query);
+        return orderRepository.findAll(criteria, page);
     }
 }

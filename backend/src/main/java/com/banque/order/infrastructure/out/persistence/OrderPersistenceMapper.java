@@ -24,6 +24,7 @@ public class OrderPersistenceMapper {
                 order.status().name(),
                 order.total().currency(),
                 order.createdAt(),
+                order.total().amount(),   // dénormalisé : calculé par le domaine, stocké pour le tri
                 lines);
     }
 

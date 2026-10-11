@@ -1,6 +1,31 @@
 <section class="orders">
   <h1>Mes commandes</h1>
 
+  <div class="toolbar">
+    <input
+      #searchInput
+      type="search"
+      class="search"
+      placeholder="Rechercher un client ou un produit…"
+      aria-label="Rechercher une commande"
+      maxlength="50"
+      [value]="searchText()"
+      (input)="onSearchInput(searchInput.value)"
+    />
+    <select
+      #sortSelect
+      class="sort"
+      aria-label="Trier les commandes"
+      [value]="sort()"
+      (change)="onSortChange(sortSelect.value)"
+    >
+      <option value="CREATED_AT_DESC">Plus récentes</option>
+      <option value="CREATED_AT_ASC">Plus anciennes</option>
+      <option value="TOTAL_DESC">Montant décroissant</option>
+      <option value="TOTAL_ASC">Montant croissant</option>
+    </select>
+  </div>
+
   @if (view$ | async; as view) {
     @switch (view.kind) {
       @case ('loaded') {
@@ -15,7 +40,13 @@
               </a>
             </li>
           } @empty {
-            <li class="empty" data-testid="empty">Vous n'avez encore passé aucune commande.</li>
+            @if (query()) {
+              <li class="empty" data-testid="no-result">
+                Aucune commande ne correspond à « {{ query() }} ».
+              </li>
+            } @else {
+              <li class="empty" data-testid="empty">Vous n'avez encore passé aucune commande.</li>
+            }
           }
         </ul>
         @if (view.page.totalPages > 1) {
